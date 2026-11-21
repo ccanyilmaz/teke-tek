@@ -1,7 +1,10 @@
 node_modules/
 build/
 dist/
+dev-dist/
 coverage/
+.wrangler/
+.playwright-cli/
 .DS_Store
 *.log
 .env*
