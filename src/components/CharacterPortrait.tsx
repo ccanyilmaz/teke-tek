@@ -1,17 +1,21 @@
 import React from 'react';
 import { getCharacterById } from '../game/characters';
-import type { CharacterId } from '../game/types';
+import type { CharacterId, DamageStage } from '../game/types';
 
 interface CharacterPortraitProps {
   characterId: CharacterId;
   size?: number;
   className?: string;
+  damageStage?: DamageStage;
+  mood?: 'normal' | 'victory' | 'defeat';
 }
 
 export const CharacterPortrait: React.FC<CharacterPortraitProps> = ({
   characterId,
   size = 84,
   className = '',
+  damageStage = 0,
+  mood = 'normal',
 }) => {
   const def = getCharacterById(characterId);
   const { palette, hairStyle, outfitStyle } = def;
@@ -78,6 +82,39 @@ export const CharacterPortrait: React.FC<CharacterPortraitProps> = ({
             />
           </>
         )}
+
+        {/* Progressive outfit wear on portrait */}
+        {damageStage >= 1 && (
+          <ellipse cx="34" cy="76" rx="7" ry="4" fill="rgba(101, 86, 69, 0.36)" />
+        )}
+        {damageStage >= 2 && (
+          <polygon
+            points="58,70 69,66 66,76"
+            fill={palette.skin}
+            stroke="#1E293B"
+            strokeWidth="2"
+          />
+        )}
+        {damageStage >= 3 && (
+          <>
+            <ellipse cx="56" cy="65" rx="6" ry="3.5" fill="rgba(101, 86, 69, 0.45)" />
+            <circle cx="40" cy="71" r="2.8" fill="#DC2626" />
+            <circle cx="44" cy="75" r="1.8" fill="#DC2626" />
+          </>
+        )}
+        {damageStage >= 4 && (
+          <>
+            <polygon
+              points="24,65 35,70 25,75"
+              fill={palette.skin}
+              stroke="#1E293B"
+              strokeWidth="2"
+            />
+            <circle cx="60" cy="80" r="3" fill="#DC2626" />
+            <circle cx="55" cy="82" r="1.8" fill="#DC2626" />
+          </>
+        )}
+
         <rect
           x="22"
           y="58"
@@ -139,22 +176,73 @@ export const CharacterPortrait: React.FC<CharacterPortraitProps> = ({
         </g>
       )}
 
+      {/* Progressive facial bruises & band-aid */}
+      {damageStage >= 1 && (
+        <ellipse cx="38" cy="46" rx="5.5" ry="3.6" fill="rgba(109, 40, 217, 0.36)" />
+      )}
+      {damageStage >= 2 && (
+        <ellipse cx="56" cy="39" rx="5.2" ry="4" fill="rgba(91, 33, 182, 0.42)" />
+      )}
+      {damageStage >= 3 && (
+        <>
+          <circle cx="59" cy="47" r="2.5" fill="#DC2626" />
+          <circle cx="55" cy="50" r="1.5" fill="#DC2626" />
+        </>
+      )}
+      {damageStage >= 4 && (
+        <g transform="rotate(-14 39 30)">
+          <rect
+            x="32"
+            y="27"
+            width="14"
+            height="6"
+            rx="1.5"
+            fill="#FFFDF7"
+            stroke="#1E293B"
+            strokeWidth="1.8"
+          />
+          <line x1="39" y1="27" x2="39" y2="33" stroke="#CBD5E1" strokeWidth="1.4" />
+        </g>
+      )}
+
       {/* Eyes & Brows */}
-      <circle cx="41" cy="40" r="3" fill="#1E293B" />
-      <circle cx="55" cy="40" r="3" fill="#1E293B" />
-      <circle cx="40" cy="39" r="1" fill="#FFFFFF" />
-      <circle cx="54" cy="39" r="1" fill="#FFFFFF" />
+      {mood === 'defeat' ? (
+        <g stroke="#1E293B" strokeWidth="2.4" strokeLinecap="round">
+          <line x1="38" y1="37" x2="44" y2="43" />
+          <line x1="44" y1="37" x2="38" y2="43" />
+          <line x1="52" y1="37" x2="58" y2="43" />
+          <line x1="58" y1="37" x2="52" y2="43" />
+        </g>
+      ) : (
+        <>
+          <circle cx="41" cy="40" r="3" fill="#1E293B" />
+          <circle cx="55" cy="40" r="3" fill="#1E293B" />
+          <circle cx="40" cy="39" r="1" fill="#FFFFFF" />
+          <circle cx="54" cy="39" r="1" fill="#FFFFFF" />
 
-      <path d="M36 34 L45 35.5" stroke="#1E293B" strokeWidth="2.6" strokeLinecap="round" />
-      <path d="M60 34 L51 35.5" stroke="#1E293B" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M36 34 L45 35.5" stroke="#1E293B" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M60 34 L51 35.5" stroke="#1E293B" strokeWidth="2.6" strokeLinecap="round" />
+        </>
+      )}
 
-      {/* Confident Smile */}
-      <path
-        d="M42 49 Q48 53.5 55 48.5"
-        stroke="#1E293B"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-      />
+      {/* Mouth */}
+      {mood === 'defeat' ? (
+        <circle cx="48" cy="50" r="3.6" stroke="#1E293B" strokeWidth="2.4" />
+      ) : mood === 'victory' ? (
+        <path
+          d="M40 48 Q48 56 56 48"
+          stroke="#1E293B"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path
+          d="M42 49 Q48 53.5 55 48.5"
+          stroke="#1E293B"
+          strokeWidth="2.6"
+          strokeLinecap="round"
+        />
+      )}
     </svg>
   );
 };
