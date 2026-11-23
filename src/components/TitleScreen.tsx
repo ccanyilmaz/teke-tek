@@ -1,33 +1,35 @@
 import React, { useEffect } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Globe, Swords, Volume2, VolumeX } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface TitleScreenProps {
   muted: boolean;
   onToggleMute: () => void;
-  onStart: () => void;
+  onStartSingle: () => void;
+  onStartOnline: () => void;
 }
 
 export const TitleScreen: React.FC<TitleScreenProps> = ({
   muted,
   onToggleMute,
-  onStart,
+  onStartSingle,
+  onStartOnline,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        onStart();
+        onStartSingle();
       } else if (e.key.toLowerCase() === 'm') {
         onToggleMute();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onStart, onToggleMute]);
+  }, [onStartSingle, onToggleMute]);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between px-4 pt-3 pb-6 sm:px-6 sm:pt-3 sm:pb-6">
+    <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between px-4 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-6">
       {/* Top Bar: Utility buttons + TEKE TEK Title Lockup keeping center arena open */}
       <div className="relative flex flex-col items-center">
         <div className="flex w-full items-center justify-end gap-2.5 sm:absolute sm:top-1 sm:right-0 sm:w-auto">
@@ -38,7 +40,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               onClick={onToggleMute}
               aria-label={muted ? 'Sesi aç' : 'Sesi kapat'}
               title={muted ? 'Sesi aç (M)' : 'Sesi kapat (M)'}
-              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border-2 border-[#1E293B] bg-[#FFFDF7] text-[#1E293B] shadow-[0_3px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border-2 border-[#1E293B] bg-[#FFFDF7] text-[#1E293B] shadow-[0_3px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none sm:h-11 sm:w-11"
             >
               {muted ? (
                 <VolumeX className="h-5 w-5" aria-hidden="true" />
@@ -50,7 +52,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </div>
 
         {/* Bespoke inline SVG Title Lockup positioned above the live arena */}
-        <div className="mt-1 w-full max-w-[310px] sm:mt-0 sm:max-w-[340px]">
+        <div className="w-full max-w-[235px] sm:max-w-[330px]">
           <svg
             viewBox="0 0 420 92"
             className="mx-auto h-auto w-full"
@@ -91,15 +93,27 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </div>
       </div>
 
-      {/* Bottom Primary Start CTA (leaves center live sparring arena 100% visible) */}
-      <div className="mx-auto flex w-full max-w-[280px] justify-center">
+      {/* Bottom Dual Primary CTAs (Single Player + Real-Time Online 1v1) */}
+      <div className="mx-auto flex w-full max-w-[520px] flex-row items-center justify-center gap-3">
         <button
           type="button"
           data-start="true"
-          onClick={onStart}
-          className="pointer-events-auto min-h-[54px] w-full cursor-pointer rounded-2xl border-[3px] border-[#1E293B] bg-[#E63946] px-8 py-3.5 text-lg font-black tracking-wide text-white shadow-[0_5px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E293B]"
+          data-mode="single"
+          onClick={onStartSingle}
+          className="pointer-events-auto inline-flex min-h-[48px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border-[3px] border-[#1E293B] bg-[#E63946] px-4 py-2.5 text-sm font-black tracking-wide text-white shadow-[0_5px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E293B] sm:min-h-[54px] sm:px-6 sm:text-base"
         >
-          OYUNA BAŞLA
+          <Swords className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" aria-hidden="true" />
+          <span>TEK OYUNCULU</span>
+        </button>
+
+        <button
+          type="button"
+          data-mode="online"
+          onClick={onStartOnline}
+          className="pointer-events-auto inline-flex min-h-[48px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border-[3px] border-[#1E293B] bg-[#0284C7] px-4 py-2.5 text-sm font-black tracking-wide text-white shadow-[0_5px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E293B] sm:min-h-[54px] sm:px-6 sm:text-base"
+        >
+          <Globe className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" aria-hidden="true" />
+          <span>ONLINE 1v1</span>
         </button>
       </div>
     </div>

@@ -37,29 +37,28 @@ interface Particle {
   y: number;
   vx: number;
   vy: number;
+  gravity: number;
   size: number;
   life: number;
   maxLife: number;
   color: string;
-  kind: 'star' | 'spark' | 'dust';
+  kind: 'star' | 'spark' | 'dust' | 'blood';
   rot: number;
   vRot: number;
 }
 
-interface ComicPopup {
-  active: boolean;
+interface BloodPuddle {
   x: number;
   y: number;
-  vy: number;
-  text: string;
-  life: number;
-  maxLife: number;
+  rx: number;
+  ry: number;
+  rot: number;
   color: string;
-  tilt: number;
+  alpha: number;
 }
 
-const MAX_PARTICLES = 72;
-const MAX_POPUPS = 10;
+const MAX_PARTICLES = 128;
+const MAX_BLOOD_PUDDLES = 220;
 
 export class ArenaRenderer {
   private particles: Particle[] = Array.from({ length: MAX_PARTICLES }, () => ({
@@ -68,6 +67,7 @@ export class ArenaRenderer {
     y: 0,
     vx: 0,
     vy: 0,
+    gravity: 0,
     size: 6,
     life: 0,
     maxLife: 1,
@@ -77,26 +77,16 @@ export class ArenaRenderer {
     vRot: 0,
   }));
   private particleCursor = 0;
-
-  private popups: ComicPopup[] = Array.from({ length: MAX_POPUPS }, () => ({
-    active: false,
-    x: 0,
-    y: 0,
-    vy: 0,
-    text: '',
-    life: 0,
-    maxLife: 1,
-    color: '#E63946',
-    tilt: 0,
-  }));
-  private popupCursor = 0;
+  private bloodPuddles: BloodPuddle[] = [];
 
   private floorCacheCanvas: HTMLCanvasElement | null = null;
   private floorCacheKey = '';
 
-  resetEffects(): void {
+  resetEffects(clearBlood = true): void {
     for (const p of this.particles) p.active = false;
-    for (const w of this.popups) w.active = false;
+    if (clearBlood) {
+      this.bloodPuddles = [];
+    }
   }
 
   spawnHitBurst(
@@ -104,101 +94,170 @@ export class ArenaRenderer {
     y: number,
     dirX: number,
     dirY: number,
-    comicWord?: string,
+    _comicWord?: string,
     isKO = false,
-    weaponId: WeaponId = 'yumruk'
+    weaponId: WeaponId = 'yumruk',
+    targetRemainingHpRatio = 0.75,
+    damageAmount = 8
   ): void {
-    const count = isKO ? 26 : 14;
-    let colors = ['#FACC15', '#FB923C', '#E63946', '#FFFFFF', '#38BDF8'];
+    // Minimal crisp impact sparks (no floating BAM/GÜM text)
+    const count = isKO ? 14 : 7;
+    let colors = ['#FACC15', '#FB923C', '#FFFFFF', '#E63946'];
     if (weaponId === 'isin_kilici') {
-      colors = ['#06B6D4', '#A5F3FC', '#FFFFFF', '#38BDF8', '#FACC15'];
+      colors = ['#06B6D4', '#A5F3FC', '#FFFFFF', '#38BDF8'];
     } else if (weaponId === 'baget_ekmek') {
-      colors = ['#FDE68A', '#D97706', '#F59E0B', '#FFFFFF', '#FEF3C7'];
+      colors = ['#FDE68A', '#D97706', '#FFFFFF', '#F59E0B'];
     } else if (weaponId === 'kalem') {
-      colors = ['#FACC15', '#F472B6', '#3B82F6', '#FFFFFF', '#1E293B'];
+      colors = ['#FACC15', '#F472B6', '#FFFFFF', '#1E293B'];
     }
 
     for (let i = 0; i < count; i++) {
       const p = this.particles[this.particleCursor];
       this.particleCursor = (this.particleCursor + 1) % MAX_PARTICLES;
 
-      const spread = (Math.random() - 0.5) * 2.4;
+      const spread = (Math.random() - 0.5) * 2.1;
       const baseAngle = Math.atan2(dirY, dirX) + spread;
-      const speed = (isKO ? 170 : 120) + Math.random() * 210;
+      const speed = (isKO ? 150 : 105) + Math.random() * 145;
 
       p.active = true;
       p.x = x;
       p.y = y;
       p.vx = Math.cos(baseAngle) * speed;
-      p.vy = Math.sin(baseAngle) * speed - 40;
-      p.size = i % 3 === 0 ? 8 + Math.random() * 5 : 4 + Math.random() * 4;
-      p.maxLife = (isKO ? 0.65 : 0.38) + Math.random() * 0.22;
+      p.vy = Math.sin(baseAngle) * speed - 25;
+      p.gravity = 0;
+      p.size = i % 3 === 0 ? 5.5 + Math.random() * 2.5 : 3 + Math.random() * 2.5;
+      p.maxLife = (isKO ? 0.34 : 0.22) + Math.random() * 0.1;
       p.life = p.maxLife;
       p.color = colors[i % colors.length];
-      p.kind = i % 2 === 0 ? 'star' : 'spark';
+      p.kind = 'spark';
       p.rot = Math.random() * Math.PI * 2;
-      p.vRot = (Math.random() - 0.5) * 14;
+      p.vRot = (Math.random() - 0.5) * 12;
     }
 
-    if (comicWord) {
-      const w = this.popups[this.popupCursor];
-      this.popupCursor = (this.popupCursor + 1) % MAX_POPUPS;
-      w.active = true;
-      w.x = x + (Math.random() - 0.5) * 24;
-      w.y = y - 24;
-      w.vy = -58;
-      w.text = comicWord;
-      w.maxLife = isKO ? 0.95 : 0.62;
-      w.life = w.maxLife;
-      w.color =
-        isKO
-          ? '#E63946'
-          : weaponId === 'isin_kilici'
-          ? '#06B6D4'
-          : '#F59E0B';
-      w.tilt = (Math.random() - 0.5) * 0.28;
+    this.spawnBloodSplatter(
+      x,
+      y,
+      dirX,
+      dirY,
+      targetRemainingHpRatio,
+      damageAmount,
+      isKO
+    );
+  }
+
+  spawnBloodSplatter(
+    x: number,
+    y: number,
+    dirX: number,
+    dirY: number,
+    remainingHpRatio: number,
+    damageAmount: number,
+    isKO = false
+  ): void {
+    const missingHp = Math.max(0, Math.min(1, 1 - remainingHpRatio));
+    // Scales smoothly upward as fighter HP decreases: subtle early, dramatic puddles late round
+    const severity = Math.min(
+      1,
+      0.16 + missingHp * 0.72 + Math.min(0.22, damageAmount * 0.015) + (isKO ? 0.32 : 0)
+    );
+
+    const dropCount = isKO ? 18 : Math.round(4 + severity * 11);
+    const bloodPalette = ['#B91C1C', '#DC2626', '#991B1B', '#7F1D1D'];
+    const baseAngle = Math.atan2(dirY || 0.2, dirX || 1);
+
+    for (let i = 0; i < dropCount; i++) {
+      const p = this.particles[this.particleCursor];
+      this.particleCursor = (this.particleCursor + 1) % MAX_PARTICLES;
+
+      const spread = (Math.random() - 0.5) * 1.95;
+      const angle = baseAngle + spread;
+      const speed = (65 + severity * 145) * (0.65 + Math.random() * 0.75);
+
+      p.active = true;
+      p.x = x + (Math.random() - 0.5) * 8;
+      p.y = y + (Math.random() - 0.5) * 6;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed - (50 + Math.random() * 65);
+      p.gravity = 420;
+      p.size = 2.4 + Math.random() * (2.6 + severity * 2.4);
+      p.maxLife = 0.32 + Math.random() * 0.22;
+      p.life = p.maxLife;
+      p.color = bloodPalette[i % bloodPalette.length];
+      p.kind = 'blood';
+      p.rot = 0;
+      p.vRot = 0;
+    }
+
+    // Stamp persistent round-long floor blood decals & crimson puddles
+    const floorSpots = isKO ? 7 : Math.max(1, Math.round(1 + severity * 4));
+    for (let i = 0; i < floorSpots; i++) {
+      const distAhead = (10 + Math.random() * (28 + severity * 34)) * (i === 0 ? 0.55 : 1);
+      const lateralJitter = (Math.random() - 0.5) * (20 + severity * 24);
+      const px = x + dirX * distAhead - dirY * lateralJitter;
+      const py = y + 16 + dirY * distAhead + dirX * lateralJitter * 0.65;
+      const baseR = (3.4 + severity * 7.8) * (i === 0 ? 1.25 : 0.65 + Math.random() * 0.6);
+
+      if (this.bloodPuddles.length >= MAX_BLOOD_PUDDLES) {
+        // Merge/overwrite oldest tiny droplet while keeping main puddles dense
+        this.bloodPuddles.shift();
+      }
+      this.bloodPuddles.push({
+        x: px,
+        y: py,
+        rx: baseR * (1.05 + Math.random() * 0.45),
+        ry: baseR * (0.58 + Math.random() * 0.28),
+        rot: Math.random() * Math.PI,
+        color: i % 2 === 0 ? '#991B1B' : '#B91C1C',
+        alpha: 0.52 + severity * 0.28,
+      });
+    }
+
+    // At critical HP or KO, add an unmistakable glossy crimson puddle core
+    if (remainingHpRatio <= 0.42 || isKO) {
+      if (this.bloodPuddles.length >= MAX_BLOOD_PUDDLES) {
+        this.bloodPuddles.shift();
+      }
+      const coreR = isKO ? 19 + Math.random() * 6 : 9 + severity * 9;
+      this.bloodPuddles.push({
+        x: x + dirX * (isKO ? 14 : 18),
+        y: y + 18 + dirY * 12,
+        rx: coreR * 1.32,
+        ry: coreR * 0.72,
+        rot: (Math.random() - 0.5) * 0.6,
+        color: '#7F1D1D',
+        alpha: isKO ? 0.82 : 0.68,
+      });
     }
   }
 
-  spawnPickupBurst(x: number, y: number, comicWord = '+1 TAŞ'): void {
-    const colors = ['#FACC15', '#16A34A', '#FFFFFF', '#F59E0B'];
-    for (let i = 0; i < 8; i++) {
+  spawnPickupBurst(x: number, y: number, _comicWord?: string): void {
+    const colors = ['#FACC15', '#16A34A', '#FFFFFF'];
+    for (let i = 0; i < 6; i++) {
       const p = this.particles[this.particleCursor];
       this.particleCursor = (this.particleCursor + 1) % MAX_PARTICLES;
-      const angle = (i / 8) * Math.PI * 2;
+      const angle = (i / 6) * Math.PI * 2;
       p.active = true;
       p.x = x;
       p.y = y;
-      p.vx = Math.cos(angle) * 75;
-      p.vy = Math.sin(angle) * 75 - 35;
-      p.size = 5.5;
-      p.maxLife = 0.35;
+      p.vx = Math.cos(angle) * 65;
+      p.vy = Math.sin(angle) * 65 - 25;
+      p.gravity = 0;
+      p.size = 4;
+      p.maxLife = 0.28;
       p.life = p.maxLife;
       p.color = colors[i % colors.length];
-      p.kind = 'star';
-      p.rot = 0;
-      p.vRot = 8;
+      p.kind = 'spark';
+      p.rot = angle;
+      p.vRot = 6;
     }
-
-    const w = this.popups[this.popupCursor];
-    this.popupCursor = (this.popupCursor + 1) % MAX_POPUPS;
-    w.active = true;
-    w.x = x;
-    w.y = y - 16;
-    w.vy = -64;
-    w.text = comicWord;
-    w.maxLife = 0.6;
-    w.life = w.maxLife;
-    w.color = '#16A34A';
-    w.tilt = -0.06;
   }
 
   spawnBlockBurst(x: number, y: number, comicWord = 'BLOK!'): void {
     const isPerfect = comicWord.includes('TAM');
     const colors = isPerfect
       ? ['#FACC15', '#38BDF8', '#FFFFFF', '#0284C7']
-      : ['#38BDF8', '#E0F2FE', '#FFFFFF', '#94A3B8'];
-    const count = isPerfect ? 12 : 7;
+      : ['#38BDF8', '#E0F2FE', '#FFFFFF'];
+    const count = isPerfect ? 10 : 5;
     for (let i = 0; i < count; i++) {
       const p = this.particles[this.particleCursor];
       this.particleCursor = (this.particleCursor + 1) % MAX_PARTICLES;
@@ -206,42 +265,38 @@ export class ArenaRenderer {
       p.active = true;
       p.x = x;
       p.y = y;
-      p.vx = Math.cos(angle) * (isPerfect ? 130 : 88);
-      p.vy = Math.sin(angle) * (isPerfect ? 130 : 88) - 20;
-      p.size = isPerfect ? 6.5 : 4.8;
-      p.maxLife = isPerfect ? 0.34 : 0.25;
+      p.vx = Math.cos(angle) * (isPerfect ? 120 : 80);
+      p.vy = Math.sin(angle) * (isPerfect ? 120 : 80) - 18;
+      p.gravity = 0;
+      p.size = isPerfect ? 5.2 : 3.8;
+      p.maxLife = isPerfect ? 0.28 : 0.2;
       p.life = p.maxLife;
       p.color = colors[i % colors.length];
-      p.kind = isPerfect && i % 2 === 0 ? 'star' : 'spark';
+      p.kind = 'spark';
       p.rot = angle;
       p.vRot = 8;
     }
-
-    const w = this.popups[this.popupCursor];
-    this.popupCursor = (this.popupCursor + 1) % MAX_POPUPS;
-    w.active = true;
-    w.x = x;
-    w.y = y - 22;
-    w.vy = -56;
-    w.text = comicWord;
-    w.maxLife = isPerfect ? 0.65 : 0.5;
-    w.life = w.maxLife;
-    w.color = isPerfect ? '#0284C7' : '#38BDF8';
-    w.tilt = -0.04;
   }
 
-  spawnEvadeCue(x: number, y: number, comicWord = 'SIYRILDI!'): void {
-    const w = this.popups[this.popupCursor];
-    this.popupCursor = (this.popupCursor + 1) % MAX_POPUPS;
-    w.active = true;
-    w.x = x;
-    w.y = y - 20;
-    w.vy = -52;
-    w.text = comicWord;
-    w.maxLife = 0.48;
-    w.life = w.maxLife;
-    w.color = '#0EA5E9';
-    w.tilt = 0.05;
+  spawnEvadeCue(x: number, y: number, _comicWord?: string): void {
+    for (let i = 0; i < 4; i++) {
+      const p = this.particles[this.particleCursor];
+      this.particleCursor = (this.particleCursor + 1) % MAX_PARTICLES;
+      const angle = (i / 4) * Math.PI * 2;
+      p.active = true;
+      p.x = x;
+      p.y = y;
+      p.vx = Math.cos(angle) * 55;
+      p.vy = Math.sin(angle) * 55;
+      p.gravity = 0;
+      p.size = 4.2;
+      p.maxLife = 0.2;
+      p.life = p.maxLife;
+      p.color = 'rgba(56, 189, 248, 0.7)';
+      p.kind = 'dust';
+      p.rot = 0;
+      p.vRot = 0;
+    }
   }
 
   spawnDodgeCue(x: number, y: number, dirX: number, dirY: number): void {
@@ -253,6 +308,7 @@ export class ArenaRenderer {
       p.y = y - dirY * (i * 5) + 6;
       p.vx = -dirX * 35 + (Math.random() - 0.5) * 20;
       p.vy = -dirY * 35 + (Math.random() - 0.5) * 20;
+      p.gravity = 0;
       p.size = 6;
       p.maxLife = 0.24;
       p.life = p.maxLife;
@@ -271,6 +327,7 @@ export class ArenaRenderer {
     p.y = y + 12;
     p.vx = (Math.random() - 0.5) * 26;
     p.vy = -12 - Math.random() * 18;
+    p.gravity = 0;
     p.size = 4 + Math.random() * 4;
     p.maxLife = 0.28;
     p.life = p.maxLife;
@@ -288,22 +345,17 @@ export class ArenaRenderer {
         p.active = false;
         continue;
       }
+      if (p.gravity !== 0) {
+        p.vy += p.gravity * dt;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vx *= Math.exp(-5 * dt);
-      p.vy *= Math.exp(-5 * dt);
-      p.rot += p.vRot * dt;
-    }
-
-    for (const w of this.popups) {
-      if (!w.active) continue;
-      w.life -= dt;
-      if (w.life <= 0) {
-        w.active = false;
-        continue;
+      const drag = p.kind === 'blood' ? Math.exp(-2.6 * dt) : Math.exp(-5 * dt);
+      p.vx *= drag;
+      if (p.gravity === 0) {
+        p.vy *= drag;
       }
-      w.y += w.vy * dt;
-      w.vy *= Math.exp(-4 * dt);
+      p.rot += p.vRot * dt;
     }
   }
 
@@ -313,7 +365,8 @@ export class ArenaRenderer {
     canvasHeight: number,
     match: MatchState,
     timeSeconds: number,
-    isTitleBackdrop = false
+    isTitleBackdrop = false,
+    localRole: 'player' | 'opponent' = 'player'
   ): void {
     ctx.save();
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
@@ -357,6 +410,9 @@ export class ArenaRenderer {
     this.drawArenaSurroundings(ctx, bounds, theme, timeSeconds, isTitleBackdrop);
     this.drawCachedArenaFloor(ctx, bounds, theme);
     this.drawFloorDetailsAnimated(ctx, bounds, theme, timeSeconds);
+    if (!isTitleBackdrop) {
+      this.drawBloodPuddles(ctx, bounds);
+    }
 
     // Draw dropped collectible stones on the mat
     this.drawFloorStones(ctx, match, timeSeconds);
@@ -372,7 +428,14 @@ export class ArenaRenderer {
         match.winnerRole !== null && match.winnerRole !== fighter.role;
       const isWinner =
         match.winnerRole !== null && match.winnerRole === fighter.role;
-      this.drawFighter(ctx, fighter, timeSeconds, isWinner, isLoser);
+      this.drawFighter(
+        ctx,
+        fighter,
+        timeSeconds,
+        isWinner,
+        isLoser,
+        fighter.role === localRole
+      );
     }
 
     // Draw flying slingshot projectiles
@@ -380,7 +443,24 @@ export class ArenaRenderer {
 
     this.drawParticles(ctx);
     this.drawForegroundAmbience(ctx, bounds, theme, timeSeconds);
-    this.drawComicPopups(ctx);
+
+    if (!isTitleBackdrop) {
+      for (const fighter of fighters) {
+        if (!fighter.nickname) continue;
+        const isLoser =
+          match.winnerRole !== null && match.winnerRole !== fighter.role;
+        const isWinner =
+          match.winnerRole !== null && match.winnerRole === fighter.role;
+        this.drawFighterNickname(
+          ctx,
+          fighter,
+          bounds,
+          isWinner,
+          isLoser,
+          fighter.role === localRole
+        );
+      }
+    }
 
     ctx.restore();
   }
@@ -1357,7 +1437,8 @@ export class ArenaRenderer {
     f: FighterState,
     timeSeconds: number,
     isWinner: boolean,
-    isLoser: boolean
+    isLoser: boolean,
+    isLocalFighter = f.role === 'player'
   ): void {
     const def = getCharacterById(f.characterId);
     const cos = Math.cos(f.facingAngle);
@@ -1367,10 +1448,11 @@ export class ArenaRenderer {
     ctx.save();
     ctx.translate(f.x, f.y + 18);
 
-    ctx.strokeStyle =
-      f.role === 'player' ? 'rgba(230, 57, 70, 0.55)' : 'rgba(2, 132, 199, 0.45)';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash(f.role === 'player' ? [] : [5, 4]);
+    ctx.strokeStyle = isLocalFighter
+      ? 'rgba(230, 57, 70, 0.72)'
+      : 'rgba(2, 132, 199, 0.5)';
+    ctx.lineWidth = isLocalFighter ? 3 : 2.5;
+    ctx.setLineDash(isLocalFighter ? [] : [5, 4]);
     ctx.beginPath();
     ctx.ellipse(0, 0, 26, 11, 0, 0, Math.PI * 2);
     ctx.stroke();
@@ -1685,6 +1767,50 @@ export class ArenaRenderer {
       }
     }
 
+    ctx.restore();
+  }
+
+  private drawFighterNickname(
+    ctx: CanvasRenderingContext2D,
+    f: FighterState,
+    bounds: ArenaBounds,
+    isWinner: boolean,
+    isLoser: boolean,
+    isLocalFighter: boolean
+  ): void {
+    const label = f.nickname?.trim();
+    if (!label) return;
+
+    const walkBob = Math.abs(Math.sin(f.walkPhase)) * 3.5;
+    const victoryHop = isWinner ? Math.abs(Math.sin(f.victoryBouncePhase)) * 18 : 0;
+    const defeatSink = isLoser ? 11 : 0;
+
+    ctx.save();
+    ctx.font = '800 10.5px "Plus Jakarta Sans", "Inter", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const textWidth = ctx.measureText(label).width;
+    const pillW = Math.ceil(textWidth) + 12;
+    const pillH = 16;
+
+    const minX = pillW / 2 + 8;
+    const maxX = bounds.width - pillW / 2 - 8;
+    const drawX = Math.max(minX, Math.min(maxX, f.x));
+    const rawY = f.y - walkBob - victoryHop + defeatSink - (isLoser ? 58 : 51);
+    const drawY = Math.max(14, rawY);
+
+    ctx.fillStyle = isLocalFighter
+      ? 'rgba(15, 23, 42, 0.82)'
+      : 'rgba(15, 23, 42, 0.75)';
+    ctx.strokeStyle = isLocalFighter ? '#FACC15' : '#38BDF8';
+    ctx.lineWidth = 1.4;
+    this.roundRectPath(ctx, drawX - pillW / 2, drawY - pillH / 2, pillW, pillH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isLocalFighter ? '#FEF9C3' : '#F8FAFC';
+    ctx.fillText(label, drawX, drawY + 0.5);
     ctx.restore();
   }
 
@@ -2256,6 +2382,43 @@ export class ArenaRenderer {
     ctx.restore();
   }
 
+  private drawBloodPuddles(
+    ctx: CanvasRenderingContext2D,
+    bounds: ArenaBounds
+  ): void {
+    if (this.bloodPuddles.length === 0) return;
+    const matLeft = bounds.paddingX + 4;
+    const matTop = bounds.paddingY + 4;
+    const matWidth = bounds.width - bounds.paddingX * 2 - 8;
+    const matHeight = bounds.height - bounds.paddingY * 2 - 8;
+
+    ctx.save();
+    this.roundRectPath(ctx, matLeft, matTop, matWidth, matHeight, 14);
+    ctx.clip();
+
+    for (const b of this.bloodPuddles) {
+      ctx.save();
+      ctx.globalAlpha = b.alpha;
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, b.rx, b.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Subtle glossy highlight on fresh puddles
+      if (b.rx > 9) {
+        ctx.globalAlpha = b.alpha * 0.3;
+        ctx.fillStyle = '#EF4444';
+        ctx.beginPath();
+        ctx.ellipse(-b.rx * 0.22, -b.ry * 0.2, b.rx * 0.34, b.ry * 0.26, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
   private drawParticles(ctx: CanvasRenderingContext2D): void {
     for (const p of this.particles) {
       if (!p.active) continue;
@@ -2264,7 +2427,12 @@ export class ArenaRenderer {
       ctx.globalAlpha = alpha;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
-      if (p.kind === 'star') {
+      if (p.kind === 'blood') {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size, p.size * 0.78, Math.atan2(p.vy, p.vx), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'star') {
         this.drawStar(ctx, 0, 0, p.size, p.color, '#1E293B');
       } else if (p.kind === 'spark') {
         ctx.fillStyle = p.color;
@@ -2278,33 +2446,6 @@ export class ArenaRenderer {
         ctx.arc(0, 0, p.size * (1.2 - alpha * 0.4), 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.restore();
-    }
-  }
-
-  private drawComicPopups(ctx: CanvasRenderingContext2D): void {
-    for (const w of this.popups) {
-      if (!w.active) continue;
-      const progress = 1 - w.life / w.maxLife;
-      const popScale =
-        progress < 0.2 ? 0.6 + (progress / 0.2) * 0.65 : 1.25 - progress * 0.25;
-      const alpha = w.life < 0.18 ? w.life / 0.18 : 1;
-
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, alpha);
-      ctx.translate(w.x, w.y);
-      ctx.rotate(w.tilt);
-      ctx.scale(popScale, popScale);
-
-      ctx.font = '900 24px "Trebuchet MS", system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = '#1E293B';
-      ctx.lineJoin = 'round';
-      ctx.strokeText(w.text, 0, 0);
-      ctx.fillStyle = w.color;
-      ctx.fillText(w.text, 0, 0);
       ctx.restore();
     }
   }

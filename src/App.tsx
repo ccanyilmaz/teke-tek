@@ -7,9 +7,18 @@ import { useCallback, useState, useEffect } from 'react';
 import { BattleArena, type RoundCompletionPayload } from './components/BattleArena';
 import { CharacterSelect } from './components/CharacterSelect';
 import { GameOverModal, PauseModal } from './components/GameModals';
+import { OnlineExperience } from './components/OnlineExperience';
+import {
+  OrientationGuard,
+  tryLockLandscapeOrientation,
+} from './components/OrientationGuard';
 import { TitleScreen } from './components/TitleScreen';
 import { VSScreen } from './components/VSScreen';
 import { WeaponRouletteScreen } from './components/WeaponRouletteScreen';
+import {
+  type ActiveRoomCredentials,
+  loadActiveRoomCredentials,
+} from './multiplayer/client';
 import { soundEngine } from './game/audio';
 import {
   evaluateMatchAchievements,
@@ -72,6 +81,13 @@ export default function App() {
     };
   });
 
+  const [initialActiveRoom, setInitialActiveRoom] = useState<ActiveRoomCredentials | null>(
+    () => (autostart ? null : loadActiveRoomCredentials())
+  );
+  const [mode, setMode] = useState<'single' | 'online'>(() =>
+    !autostart && loadActiveRoomCredentials() ? 'online' : 'single'
+  );
+
   const [screenState, setScreenState] = useState<GameScreenState>(
     autostart ? 'playing' : 'title'
   );
@@ -79,8 +95,10 @@ export default function App() {
   const [lastSummary, setLastSummary] = useState<MatchSummary | null>(null);
 
   useEffect(() => {
-    document.body.dataset.state = screenState;
-  }, [screenState]);
+    if (mode === 'single') {
+      document.body.dataset.state = screenState;
+    }
+  }, [mode, screenState]);
 
   const handleToggleMute = useCallback(() => {
     setMuted((prevMuted) => {
@@ -94,7 +112,22 @@ export default function App() {
 
   const handleGoToSelect = useCallback(() => {
     soundEngine.playClick();
+    tryLockLandscapeOrientation();
+    setMode('single');
     setScreenState('select');
+  }, []);
+
+  const handleGoOnline = useCallback(() => {
+    soundEngine.playClick();
+    tryLockLandscapeOrientation();
+    setInitialActiveRoom(loadActiveRoomCredentials());
+    setMode('online');
+  }, []);
+
+  const handleExitOnlineToMenu = useCallback(() => {
+    setInitialActiveRoom(null);
+    setMode('single');
+    setScreenState('title');
   }, []);
 
   // Clicking a character immediately picks random opponent & enters VS Screen
@@ -216,107 +249,119 @@ export default function App() {
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-[#FBF7EE] text-[#1E293B]">
-      {screenState === 'select' && (
-        <CharacterSelect
-          selectedId={series.playerCharacterId}
-          muted={muted}
-          onSelectAndProceed={handleSelectCharacterAndProceed}
-          onBack={() => {
-            soundEngine.playClick();
-            setScreenState('title');
-          }}
-          onToggleMute={handleToggleMute}
-        />
-      )}
-
-      {screenState === 'vs' && (
-        <VSScreen
-          playerCharacterId={series.playerCharacterId}
-          opponentCharacterId={series.opponentCharacterId}
+      {mode === 'online' ? (
+        <OnlineExperience
           muted={muted}
           onToggleMute={handleToggleMute}
-          onBackToSelect={() => {
-            soundEngine.playClick();
-            setScreenState('select');
-          }}
-          onComplete={handleVSComplete}
+          onExitToMenu={handleExitOnlineToMenu}
+          initialActiveRoom={initialActiveRoom}
         />
-      )}
+      ) : (
+        <>
+          {screenState === 'select' && (
+            <CharacterSelect
+              selectedId={series.playerCharacterId}
+              muted={muted}
+              onSelectAndProceed={handleSelectCharacterAndProceed}
+              onBack={() => {
+                soundEngine.playClick();
+                setScreenState('title');
+              }}
+              onToggleMute={handleToggleMute}
+            />
+          )}
 
-      {screenState === 'weapon-roulette' && (
-        <WeaponRouletteScreen
-          playerCharacterId={series.playerCharacterId}
-          opponentCharacterId={series.opponentCharacterId}
-          playerWins={series.playerWins}
-          opponentWins={series.opponentWins}
-          currentRound={series.currentRound}
-          isFinalRound={isFinalDeciderRound(series)}
-          rerollAvailable={!series.rerollUsed}
-          muted={muted}
-          onToggleMute={handleToggleMute}
-          onUseReroll={handleUseReroll}
-          onComplete={handleWeaponRouletteComplete}
-        />
-      )}
+          {screenState === 'vs' && (
+            <VSScreen
+              playerCharacterId={series.playerCharacterId}
+              opponentCharacterId={series.opponentCharacterId}
+              muted={muted}
+              onToggleMute={handleToggleMute}
+              onBackToSelect={() => {
+                soundEngine.playClick();
+                setScreenState('select');
+              }}
+              onComplete={handleVSComplete}
+            />
+          )}
 
-      {showBattleArena && (
-        <BattleArena
-          screenState={screenState}
-          playerCharacterId={series.playerCharacterId}
-          opponentCharacterId={series.opponentCharacterId}
-          playerWeaponId={series.playerWeaponId}
-          opponentWeaponId={series.opponentWeaponId}
-          playerWins={series.playerWins}
-          opponentWins={series.opponentWins}
-          currentRound={series.currentRound}
-          playerTotalDamageTaken={series.playerTotalDamageTaken}
-          opponentTotalDamageTaken={series.opponentTotalDamageTaken}
-          isFinalRound={isFinalDeciderRound(series)}
-          matchSeed={matchSeed}
-          muted={muted}
-          onToggleMute={handleToggleMute}
-          onTogglePause={handleTogglePause}
-          onRoundFinish={handleRoundFinish}
-        />
-      )}
+          {screenState === 'weapon-roulette' && (
+            <WeaponRouletteScreen
+              playerCharacterId={series.playerCharacterId}
+              opponentCharacterId={series.opponentCharacterId}
+              playerWins={series.playerWins}
+              opponentWins={series.opponentWins}
+              currentRound={series.currentRound}
+              isFinalRound={isFinalDeciderRound(series)}
+              rerollAvailable={!series.rerollUsed}
+              muted={muted}
+              onToggleMute={handleToggleMute}
+              onUseReroll={handleUseReroll}
+              onComplete={handleWeaponRouletteComplete}
+            />
+          )}
 
-      {screenState === 'title' && (
-        <TitleScreen
-          muted={muted}
-          onToggleMute={handleToggleMute}
-          onStart={handleGoToSelect}
-        />
-      )}
+          {showBattleArena && (
+            <BattleArena
+              screenState={screenState}
+              playerCharacterId={series.playerCharacterId}
+              opponentCharacterId={series.opponentCharacterId}
+              playerWeaponId={series.playerWeaponId}
+              opponentWeaponId={series.opponentWeaponId}
+              playerWins={series.playerWins}
+              opponentWins={series.opponentWins}
+              currentRound={series.currentRound}
+              playerTotalDamageTaken={series.playerTotalDamageTaken}
+              opponentTotalDamageTaken={series.opponentTotalDamageTaken}
+              isFinalRound={isFinalDeciderRound(series)}
+              matchSeed={matchSeed}
+              muted={muted}
+              onToggleMute={handleToggleMute}
+              onTogglePause={handleTogglePause}
+              onRoundFinish={handleRoundFinish}
+            />
+          )}
 
-      {screenState === 'paused' && (
-        <PauseModal
-          onResume={() => {
-            soundEngine.playClick();
-            setScreenState('playing');
-          }}
-          onRestart={() => {
-            soundEngine.playClick();
-            restartCurrentMatchToRoulette();
-          }}
-          onCharacterSelect={() => {
-            soundEngine.playClick();
-            setScreenState('select');
-          }}
-        />
-      )}
+          {screenState === 'title' && (
+            <TitleScreen
+              muted={muted}
+              onToggleMute={handleToggleMute}
+              onStartSingle={handleGoToSelect}
+              onStartOnline={handleGoOnline}
+            />
+          )}
 
-      {screenState === 'gameover' && lastSummary && (
-        <GameOverModal
-          summary={lastSummary}
-          onPlayAgain={() => {
-            soundEngine.playClick();
-            restartCurrentMatchToRoulette();
-          }}
-          onCharacterSelect={() => {
-            soundEngine.playClick();
-            setScreenState('select');
-          }}
-        />
+          {screenState === 'paused' && (
+            <PauseModal
+              onResume={() => {
+                soundEngine.playClick();
+                setScreenState('playing');
+              }}
+              onRestart={() => {
+                soundEngine.playClick();
+                restartCurrentMatchToRoulette();
+              }}
+              onCharacterSelect={() => {
+                soundEngine.playClick();
+                setScreenState('select');
+              }}
+            />
+          )}
+
+          {screenState === 'gameover' && lastSummary && (
+            <GameOverModal
+              summary={lastSummary}
+              onPlayAgain={() => {
+                soundEngine.playClick();
+                restartCurrentMatchToRoulette();
+              }}
+              onCharacterSelect={() => {
+                soundEngine.playClick();
+                setScreenState('select');
+              }}
+            />
+          )}
+        </>
       )}
 
       {!isOnline && (
@@ -324,6 +369,8 @@ export default function App() {
           Çevrimdışı Mod
         </div>
       )}
+
+      <OrientationGuard />
     </main>
   );
 }

@@ -13,6 +13,7 @@ interface TouchControlsProps {
   dodgeReady?: boolean;
   dodgeCooldownSec?: number;
   isBlocking?: boolean;
+  floating?: boolean;
 }
 
 export const TouchControls: React.FC<TouchControlsProps> = ({
@@ -27,6 +28,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   dodgeReady = true,
   dodgeCooldownSec = 0,
   isBlocking = false,
+  floating = false,
 }) => {
   const padRef = useRef<HTMLDivElement | null>(null);
   const padPointerIdRef = useRef<number | null>(null);
@@ -130,10 +132,12 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
 
   return (
     <div
-      className="flex w-full select-none items-center justify-between gap-2 px-1 py-0.5 min-[390px]:px-2"
+      className={`flex w-full select-none items-end justify-between gap-3 ${
+        floating ? 'pointer-events-none px-2.5 pb-1.5 sm:px-4 sm:pb-2.5' : 'px-1 py-0.5 min-[390px]:px-2'
+      }`}
       style={{ touchAction: 'none' }}
     >
-      {/* Left 4-Way Touch Pad */}
+      {/* Left Virtual Joystick */}
       <div
         ref={padRef}
         role="group"
@@ -142,38 +146,42 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
         onPointerMove={handlePadPointerMove}
         onPointerUp={handlePadPointerEnd}
         onPointerCancel={handlePadPointerEnd}
-        className="relative flex h-[104px] w-[104px] shrink-0 items-center justify-center rounded-full border-[3px] border-[#1E293B] bg-[#FFFDF7] shadow-[0_4px_0_#1E293B] min-[390px]:h-[114px] min-[390px]:w-[114px] sm:h-[124px] sm:w-[124px]"
+        className={`pointer-events-auto relative flex shrink-0 items-center justify-center rounded-full border-[3px] border-[#1E293B] shadow-[0_4px_0_#1E293B] ${
+          floating
+            ? 'h-[96px] w-[96px] bg-[#FFFDF7]/88 sm:h-[110px] sm:w-[110px]'
+            : 'h-[104px] w-[104px] bg-[#FFFDF7] min-[390px]:h-[114px] min-[390px]:w-[114px] sm:h-[124px] sm:w-[124px]'
+        }`}
         style={{ touchAction: 'none' }}
       >
         <ArrowUp
-          className="pointer-events-none absolute top-1.5 h-4 w-4 text-[#64748B] min-[390px]:top-2 min-[390px]:h-5 min-[390px]:w-5"
+          className="pointer-events-none absolute top-1.5 h-4 w-4 text-[#475569] sm:top-2"
           aria-hidden="true"
         />
         <ArrowDown
-          className="pointer-events-none absolute bottom-1.5 h-4 w-4 text-[#64748B] min-[390px]:bottom-2 min-[390px]:h-5 min-[390px]:w-5"
+          className="pointer-events-none absolute bottom-1.5 h-4 w-4 text-[#475569] sm:bottom-2"
           aria-hidden="true"
         />
         <ArrowLeft
-          className="pointer-events-none absolute left-1.5 h-4 w-4 text-[#64748B] min-[390px]:left-2 min-[390px]:h-5 min-[390px]:w-5"
+          className="pointer-events-none absolute left-1.5 h-4 w-4 text-[#475569] sm:left-2"
           aria-hidden="true"
         />
         <ArrowRight
-          className="pointer-events-none absolute right-1.5 h-4 w-4 text-[#64748B] min-[390px]:right-2 min-[390px]:h-5 min-[390px]:w-5"
+          className="pointer-events-none absolute right-1.5 h-4 w-4 text-[#475569] sm:right-2"
           aria-hidden="true"
         />
 
         <div
-          className="pointer-events-none h-10 w-10 rounded-full border-[3px] border-[#1E293B] bg-[#FACC15] shadow-[0_2px_0_#1E293B] min-[390px]:h-11 min-[390px]:w-11"
+          className="pointer-events-none h-9 w-9 rounded-full border-[3px] border-[#1E293B] bg-[#FACC15] shadow-[0_2px_0_#1E293B] sm:h-10 sm:w-10"
           style={{
             transform: `translate3d(${knob.x}px, ${knob.y}px, 0)`,
           }}
         />
       </div>
 
-      {/* Right Action Cluster: Block + Dodge + Special + Primary Attack */}
-      <div className="flex items-end gap-1.5 min-[390px]:gap-2">
-        <div className="flex flex-col items-end gap-1.5 min-[390px]:gap-2">
-          <div className="flex items-center gap-1.5 min-[390px]:gap-2">
+      {/* Right Multi-Touch Action Cluster */}
+      <div className="pointer-events-auto flex items-end gap-2">
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
             {/* Dodge Button */}
             <button
               type="button"
@@ -186,13 +194,13 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
                 if (e.detail === 0) onDodge();
               }}
               style={{ touchAction: 'none' }}
-              className={`flex h-12 min-w-[54px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-[#1E293B] px-1.5 text-[10px] font-black transition-transform active:translate-y-0.5 active:shadow-none min-[390px]:min-w-[60px] min-[390px]:px-2 ${
+              className={`flex h-11 min-w-[54px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-[#1E293B] px-2 text-[10px] font-black transition-transform active:translate-y-0.5 active:shadow-none sm:h-12 sm:min-w-[60px] ${
                 dodgeReady
-                  ? 'bg-[#E0F2FE] text-[#0369A1] shadow-[0_3px_0_#1E293B]'
-                  : 'bg-[#E2E8F0] text-[#64748B] opacity-80 shadow-[0_2px_0_#64748B]'
+                  ? 'bg-[#E0F2FE]/95 text-[#0369A1] shadow-[0_3px_0_#1E293B]'
+                  : 'bg-[#E2E8F0]/90 text-[#64748B] opacity-85 shadow-[0_2px_0_#64748B]'
               }`}
             >
-              <Wind className="h-4 w-4" aria-hidden="true" />
+              <Wind className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
               <span className="tabular-nums">
                 {dodgeReady ? 'KAÇIN' : `${dodgeCooldownSec.toFixed(1)}s`}
               </span>
@@ -210,20 +218,20 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
                 if (e.detail === 0) onSpecial();
               }}
               style={{ touchAction: 'none' }}
-              className={`flex h-12 min-w-[56px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-[#1E293B] px-1.5 text-[10px] font-black transition-transform active:translate-y-0.5 active:shadow-none min-[390px]:min-w-[62px] min-[390px]:px-2 ${
+              className={`flex h-11 min-w-[54px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-[#1E293B] px-2 text-[10px] font-black transition-transform active:translate-y-0.5 active:shadow-none sm:h-12 sm:min-w-[62px] ${
                 specialReady
-                  ? 'bg-[#FACC15] text-[#1E293B] shadow-[0_3px_0_#1E293B]'
-                  : 'bg-[#FEF3C7] text-[#92400E] opacity-80 shadow-[0_2px_0_#92400E]'
+                  ? 'bg-[#FACC15]/95 text-[#1E293B] shadow-[0_3px_0_#1E293B]'
+                  : 'bg-[#FEF3C7]/90 text-[#92400E] opacity-85 shadow-[0_2px_0_#92400E]'
               }`}
             >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
               <span className="tabular-nums">
                 {specialReady ? 'ÖZEL' : `${specialCooldownSec.toFixed(1)}s`}
               </span>
             </button>
           </div>
 
-          {/* Hold-to-Block Button (captured pointer so thumb drift never drops guard) */}
+          {/* Hold-to-Block Button */}
           <button
             type="button"
             aria-label="Blok yap"
@@ -232,14 +240,14 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             onPointerCancel={handleBlockEnd}
             onLostPointerCapture={handleBlockEnd}
             style={{ touchAction: 'none' }}
-            className={`flex h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-2xl border-2 border-[#1E293B] px-2.5 text-[11px] font-black transition-transform min-[390px]:text-xs ${
+            className={`flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-2xl border-2 border-[#1E293B] px-2.5 text-[11px] font-black transition-transform sm:h-11 sm:text-xs ${
               isBlocking
                 ? 'translate-y-0.5 bg-[#0284C7] text-white shadow-none'
-                : 'bg-[#FFFDF7] text-[#1E293B] shadow-[0_3px_0_#1E293B]'
+                : 'bg-[#FFFDF7]/92 text-[#1E293B] shadow-[0_3px_0_#1E293B]'
             }`}
           >
-            <Shield className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>BLOK (BASILI)</span>
+            <Shield className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+            <span>BLOK</span>
           </button>
         </div>
 
@@ -255,13 +263,13 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             if (e.detail === 0) onPunch();
           }}
           style={{ touchAction: 'none' }}
-          className={`flex h-[78px] w-[78px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-[3px] border-[#1E293B] text-white transition-transform min-[390px]:h-[86px] min-[390px]:w-[86px] sm:h-[94px] sm:w-[94px] ${
+          className={`flex h-[74px] w-[74px] shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-[3px] border-[#1E293B] text-white transition-transform sm:h-[86px] sm:w-[86px] ${
             punchActive
               ? 'translate-y-1 bg-[#DC2626] shadow-none'
-              : 'bg-[#E63946] shadow-[0_6px_0_#1E293B]'
+              : 'bg-[#E63946]/95 shadow-[0_5px_0_#1E293B]'
           }`}
         >
-          <span className="text-sm font-black tracking-wide sm:text-base">{actionLabel}</span>
+          <span className="text-xs font-black tracking-wide sm:text-sm">{actionLabel}</span>
         </button>
       </div>
     </div>

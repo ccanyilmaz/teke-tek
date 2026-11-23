@@ -14,6 +14,7 @@ import {
   isPunchInHitRange,
   PORTRAIT_ARENA_BOUNDS,
   stepMatch,
+  stepTwoPlayerMatch,
 } from './engine';
 import {
   applyRoundOutcome,
@@ -646,4 +647,49 @@ test('all 5 rounds map to distinct arena themes in exact requested order', () =>
   // Out-of-range round numbers clamp cleanly
   assert.equal(getArenaThemeForRound(0).id, 'deniz');
   assert.equal(getArenaThemeForRound(9).id, 'volkan');
+});
+
+test('stepTwoPlayerMatch simulates symmetric 2-player intents and emits remaining HP & damage metadata on hit events', () => {
+  const m = createMatchState('turk', 'ingiliz', DEFAULT_ARENA_BOUNDS, {
+    playerWeaponId: 'sopa',
+    opponentWeaponId: 'kalem',
+  });
+  m.player.x = 400;
+  m.player.y = 260;
+  m.opponent.x = 450;
+  m.opponent.y = 260;
+  m.player.facingAngle = 0;
+  m.opponent.facingAngle = Math.PI;
+
+  const collectedHits: Array<{ targetRole?: string; targetRemainingHp?: number; damageAmount?: number }> = [];
+  stepTwoPlayerMatch(
+    m,
+    { moveX: 0, moveY: 0, punchPressed: true },
+    { moveX: 0, moveY: 0, punchPressed: false },
+    1 / 60,
+    () => 0.75
+  );
+  for (let i = 0; i < 30; i++) {
+    stepTwoPlayerMatch(
+      m,
+      { moveX: 0, moveY: 0, punchPressed: false },
+      { moveX: 0, moveY: 0, punchPressed: false },
+      1 / 60,
+      () => 0.75
+    );
+    for (const ev of m.events) {
+      if (ev.type === 'hit' || ev.type === 'ko') {
+        collectedHits.push({
+          targetRole: ev.targetRole,
+          targetRemainingHp: ev.targetRemainingHp,
+          damageAmount: ev.damageAmount,
+        });
+      }
+    }
+  }
+
+  assert.equal(collectedHits.length, 1);
+  assert.equal(collectedHits[0].targetRole, 'opponent');
+  assert.ok((collectedHits[0].damageAmount ?? 0) >= 5);
+  assert.equal(collectedHits[0].targetRemainingHp, m.opponent.hp);
 });

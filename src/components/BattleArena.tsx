@@ -20,6 +20,7 @@ import type {
 } from '../game/types';
 import { getWeaponById } from '../game/weapons';
 import { CharacterPortrait } from './CharacterPortrait';
+import { useScreenWakeLock } from './OrientationGuard';
 import { TouchControls } from './TouchControls';
 import { WeaponIcon } from './WeaponIcon';
 
@@ -80,6 +81,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<ArenaRenderer>(new ArenaRenderer());
   const activeBoundsRef = useRef(DEFAULT_ARENA_BOUNDS);
+  useScreenWakeLock(screenState === 'playing');
 
   const screenStateRef = useRef<GameScreenState>(screenState);
   const matchRef = useRef<MatchState>(
@@ -113,6 +115,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
   const opponentGhostBarRef = useRef<HTMLDivElement | null>(null);
   const ghostPlayerHpRef = useRef<number>(100);
   const ghostOpponentHpRef = useRef<number>(100);
+  const lastBarWidthRef = useRef({ p: 100, pg: 100, o: 100, og: 100 });
 
   const lastHudSnapshotRef = useRef<{
     playerHp: number;
@@ -242,7 +245,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
       opponentStage: fresh.opponent.damageStage,
     };
 
-    rendererRef.current.resetEffects();
+    rendererRef.current.resetEffects(true);
     setHudHp({ player: 100, opponent: 100 });
     setHudAmmo({ player: fresh.player.ammo, opponent: fresh.opponent.ammo });
     setHudDamageStage({
@@ -251,6 +254,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
     });
     setHitPulse({ player: false, opponent: false });
 
+    lastBarWidthRef.current = { p: 100, pg: 100, o: 100, og: 100 };
     if (playerHpBarRef.current) playerHpBarRef.current.style.width = '100%';
     if (playerGhostBarRef.current) playerGhostBarRef.current.style.width = '100%';
     if (opponentHpBarRef.current) opponentHpBarRef.current.style.width = '100%';
@@ -567,6 +571,10 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
             renderer.spawnPickupBurst(ev.x, ev.y, ev.comicWord);
           } else if (ev.type === 'hit' || ev.type === 'ko') {
             soundEngine.playHit(ev.weaponId);
+            const remainingRatio =
+              ev.targetRemainingHp !== undefined
+                ? Math.max(0, ev.targetRemainingHp / 100)
+                : 0.6;
             renderer.spawnHitBurst(
               ev.x,
               ev.y,
@@ -574,7 +582,9 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               ev.dirY,
               ev.comicWord,
               ev.type === 'ko',
-              ev.weaponId
+              ev.weaponId,
+              remainingRatio,
+              ev.damageAmount ?? 8
             );
           }
         }
@@ -582,18 +592,29 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
         renderer.updateEffects(dt);
         renderer.render(ctx, cssWidth, cssHeight, match, totalTime, false);
 
-        const pPct = Math.max(0, (match.player.hp / match.player.maxHp) * 100);
-        const oPct = Math.max(0, (match.opponent.hp / match.opponent.maxHp) * 100);
+        const pPct = Math.round(Math.max(0, (match.player.hp / match.player.maxHp) * 100) * 10) / 10;
+        const oPct = Math.round(Math.max(0, (match.opponent.hp / match.opponent.maxHp) * 100) * 10) / 10;
         ghostPlayerHpRef.current += (pPct - ghostPlayerHpRef.current) * Math.min(1, dt * 4.5);
         ghostOpponentHpRef.current += (oPct - ghostOpponentHpRef.current) * Math.min(1, dt * 4.5);
+        const pgPct = Math.round(ghostPlayerHpRef.current * 10) / 10;
+        const ogPct = Math.round(ghostOpponentHpRef.current * 10) / 10;
+        const bw = lastBarWidthRef.current;
 
-        if (playerHpBarRef.current) playerHpBarRef.current.style.width = `${pPct}%`;
-        if (playerGhostBarRef.current) {
-          playerGhostBarRef.current.style.width = `${ghostPlayerHpRef.current}%`;
+        if (playerHpBarRef.current && bw.p !== pPct) {
+          bw.p = pPct;
+          playerHpBarRef.current.style.width = `${pPct}%`;
         }
-        if (opponentHpBarRef.current) opponentHpBarRef.current.style.width = `${oPct}%`;
-        if (opponentGhostBarRef.current) {
-          opponentGhostBarRef.current.style.width = `${ghostOpponentHpRef.current}%`;
+        if (playerGhostBarRef.current && bw.pg !== pgPct) {
+          bw.pg = pgPct;
+          playerGhostBarRef.current.style.width = `${pgPct}%`;
+        }
+        if (opponentHpBarRef.current && bw.o !== oPct) {
+          bw.o = oPct;
+          opponentHpBarRef.current.style.width = `${oPct}%`;
+        }
+        if (opponentGhostBarRef.current && bw.og !== ogPct) {
+          bw.og = ogPct;
+          opponentGhostBarRef.current.style.width = `${ogPct}%`;
         }
 
         const prevSnap = lastHudSnapshotRef.current;
@@ -727,10 +748,10 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
     >
       {/* Top Combat HUD: HP + Weapon + Persistent Round Scores */}
       {showArenaShell && (
-        <header className="pointer-events-none z-20 mx-auto flex w-full max-w-5xl shrink-0 items-center justify-between gap-1.5 px-2 pt-[max(0.45rem,env(safe-area-inset-top))] pb-1 sm:gap-3 sm:px-5 sm:pt-3">
+        <header className="pointer-events-none z-20 mx-auto flex w-full max-w-5xl shrink-0 items-center justify-between gap-1.5 px-2 pt-[max(0.25rem,env(safe-area-inset-top))] pb-0.5 sm:gap-3 sm:px-5 sm:pt-2 sm:pb-1">
           {/* Player Fighter Card */}
           <div
-            className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border-2 px-1.5 py-1 shadow-[0_3px_0_#1E293B] transition-colors duration-150 sm:gap-3 sm:px-3 sm:py-2 ${
+            className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border-2 px-1.5 py-0.5 shadow-[0_3px_0_#1E293B] transition-colors duration-150 sm:gap-3 sm:px-3 sm:py-1.5 ${
               hitPulse.player
                 ? 'border-[#E63946] bg-[#FEE2E2]'
                 : 'border-[#1E293B] bg-[#FFFDF7]'
@@ -740,7 +761,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               characterId={playerDef.id}
               damageStage={hudDamageStage.player}
               size={40}
-              className="h-7 w-7 shrink-0 sm:h-11 sm:w-11"
+              className="h-7 w-7 shrink-0 sm:h-10 sm:w-10"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-1">
@@ -754,7 +775,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                   {hudHp.player}
                 </span>
               </div>
-              <div className="relative mt-0.5 h-2.5 w-full overflow-hidden rounded-full border-2 border-[#1E293B] bg-[#E2E8F0] sm:mt-1 sm:h-3">
+              <div className="relative mt-0.5 h-2 w-full overflow-hidden rounded-full border-2 border-[#1E293B] bg-[#E2E8F0] sm:mt-1 sm:h-3">
                 <div
                   ref={playerGhostBarRef}
                   className="absolute inset-y-0 left-0 bg-[#FACC15]"
@@ -852,7 +873,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
 
           {/* Opponent Fighter Card */}
           <div
-            className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-1.5 rounded-2xl border-2 px-1.5 py-1 shadow-[0_3px_0_#1E293B] transition-colors duration-150 sm:gap-3 sm:px-3 sm:py-2 ${
+            className={`flex min-w-0 flex-1 flex-row-reverse items-center gap-1.5 rounded-2xl border-2 px-1.5 py-0.5 shadow-[0_3px_0_#1E293B] transition-colors duration-150 sm:gap-3 sm:px-3 sm:py-1.5 ${
               hitPulse.opponent
                 ? 'border-[#E63946] bg-[#FEE2E2]'
                 : 'border-[#1E293B] bg-[#FFFDF7]'
@@ -862,7 +883,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               characterId={opponentDef.id}
               damageStage={hudDamageStage.opponent}
               size={40}
-              className="h-7 w-7 shrink-0 sm:h-11 sm:w-11"
+              className="h-7 w-7 shrink-0 sm:h-10 sm:w-10"
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-row-reverse items-baseline justify-between gap-1">
@@ -876,7 +897,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                   {hudHp.opponent}
                 </span>
               </div>
-              <div className="relative mt-0.5 h-2.5 w-full overflow-hidden rounded-full border-2 border-[#1E293B] bg-[#E2E8F0] sm:mt-1 sm:h-3">
+              <div className="relative mt-0.5 h-2 w-full overflow-hidden rounded-full border-2 border-[#1E293B] bg-[#E2E8F0] sm:mt-1 sm:h-3">
                 <div
                   ref={opponentGhostBarRef}
                   className="absolute inset-y-0 right-0 bg-[#FACC15]"
@@ -919,20 +940,6 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
           className="block h-full w-full touch-none"
         />
 
-        {showArenaShell && intermissionPhase === 'none' && (
-          <div className="pointer-events-none absolute top-1.5 left-1/2 z-10 -translate-x-1/2">
-            <span
-              className="inline-flex items-center gap-1 rounded-full border-2 border-[#1E293B] px-2.5 py-0.5 text-[10px] font-black tracking-wide uppercase shadow-[0_2px_0_#1E293B] sm:text-xs"
-              style={{
-                backgroundColor: arenaTheme.badgeBg,
-                color: arenaTheme.badgeText,
-              }}
-            >
-              {arenaTheme.name}
-            </span>
-          </div>
-        )}
-
         {/* Automatic Round Transition & Final Round (2-2) Overlays */}
         {showArenaShell && intermissionPhase !== 'none' && (
           <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#0F172A]/45 p-4">
@@ -960,7 +967,7 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
                     </div>
                   )}
                   <p className="text-xs font-black uppercase tracking-widest text-[#16A34A]">
-                    YENİ SİLAHLAR · {arenaTheme.name}
+                    YENİ SİLAHLAR
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="flex flex-col items-center rounded-2xl border-2 border-[#1E293B] bg-[#FEF3C7] p-2.5">
@@ -992,13 +999,16 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
             </div>
           </div>
         )}
-      </div>
 
-      {/* Bottom Controls Deck */}
-      {showArenaShell && (
-        <footer className="z-20 mx-auto w-full max-w-5xl shrink-0 px-1.5 pb-[max(0.55rem,env(safe-area-inset-bottom))] min-[390px]:px-2 sm:px-5 sm:pb-3">
-          <div className={showDesktopTouchPad ? 'block' : 'block lg:hidden'}>
+        {/* Ergonomic Bottom-Corner Translucent Multi-Touch Overlay on Mobile/Landscape */}
+        {showArenaShell && screenState === 'playing' && (
+          <div
+            className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 pb-[max(0.25rem,env(safe-area-inset-bottom))] ${
+              showDesktopTouchPad ? 'block' : 'block lg:hidden'
+            }`}
+          >
             <TouchControls
+              floating
               actionLabel={touchActionLabel}
               specialReady={hudCombat.specialCooldownTenths === 0}
               specialCooldownSec={hudCombat.specialCooldownTenths / 10}
@@ -1037,28 +1047,31 @@ export const BattleArena: React.FC<BattleArenaProps> = ({
               }}
             />
           </div>
+        )}
+      </div>
 
-          <div className="hidden items-center justify-between gap-4 px-2 py-1 lg:flex">
-            <p className="rounded-full border border-[#1E293B]/25 bg-[#FFFDF7]/92 px-3 py-1 text-xs font-bold tracking-wide text-[#1E293B] shadow-[0_2px_0_rgba(30,41,59,0.2)]">
-              WASD/Ok: Hareket · Boşluk: Saldır · E: Özel · Q: Kaçın · Shift: Blok · Esc: Duraklat
-            </p>
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                setShowDesktopTouchPad((v) => !v);
-              }}
-              className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-[#FFFDF7] px-3 py-1 text-xs font-bold text-[#475569] hover:border-[#1E293B] hover:text-[#1E293B]"
-            >
-              <Gamepad2 className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>
-                {showDesktopTouchPad
-                  ? 'Dokunmatik Kontrolleri Gizle'
-                  : 'Dokunmatik Kontrolleri Göster'}
-              </span>
-            </button>
-          </div>
+      {/* Desktop Keyboard Controls Bar */}
+      {showArenaShell && (
+        <footer className="z-20 mx-auto hidden w-full max-w-5xl shrink-0 items-center justify-between gap-4 px-5 pb-2 pt-1 lg:flex">
+          <p className="rounded-full border border-[#1E293B]/25 bg-[#FFFDF7]/92 px-3 py-1 text-xs font-bold tracking-wide text-[#1E293B] shadow-[0_2px_0_rgba(30,41,59,0.2)]">
+            WASD/Ok: Hareket · Boşluk: Saldır · E: Özel · Q: Kaçın · Shift: Blok · Esc: Duraklat
+          </p>
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              setShowDesktopTouchPad((v) => !v);
+            }}
+            className="inline-flex min-h-[34px] cursor-pointer items-center gap-1.5 rounded-lg border border-[#CBD5E1] bg-[#FFFDF7] px-3 py-1 text-xs font-bold text-[#475569] hover:border-[#1E293B] hover:text-[#1E293B]"
+          >
+            <Gamepad2 className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>
+              {showDesktopTouchPad
+                ? 'Dokunmatik Kontrolleri Gizle'
+                : 'Dokunmatik Kontrolleri Göster'}
+            </span>
+          </button>
         </footer>
       )}
     </div>

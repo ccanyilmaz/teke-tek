@@ -98,6 +98,7 @@ export interface InputIntent {
 
 export interface FighterState {
   role: 'player' | 'opponent';
+  nickname?: string;
   characterId: CharacterId;
   weaponId: WeaponId;
   ammo: number; // Used by sapan (0..5)
@@ -203,6 +204,9 @@ export interface MatchHitEvent {
     | 'stone-drop'
     | 'stone-pickup';
   attackerRole: 'player' | 'opponent';
+  targetRole?: 'player' | 'opponent';
+  targetRemainingHp?: number;
+  damageAmount?: number;
   weaponId?: WeaponId;
   x: number;
   y: number;

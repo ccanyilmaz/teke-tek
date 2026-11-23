@@ -66,12 +66,18 @@ interface GameOverModalProps {
   summary: MatchSummary;
   onPlayAgain: () => void;
   onCharacterSelect: () => void;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  reasonNote?: string | null;
 }
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
   summary,
   onPlayAgain,
   onCharacterSelect,
+  primaryLabel = 'YENİDEN OYNA',
+  secondaryLabel = 'KARAKTER SEÇİMİNE DÖN',
+  reasonNote = null,
 }) => {
   const winnerDef = getCharacterById(summary.winnerCharacterId);
   const loserDef = getCharacterById(summary.loserCharacterId);
@@ -105,6 +111,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         >
           MAÇ SONUCU: {summary.playerWins} - {summary.opponentWins}
         </h2>
+
+        {reasonNote && (
+          <p className="mt-1 text-xs font-bold text-[#0284C7]">{reasonNote}</p>
+        )}
 
         {/* Merit-Based Funny Title */}
         <div className="mx-auto mt-3 inline-flex max-w-full flex-col items-center rounded-2xl border-2 border-[#1E293B] bg-[#FEF3C7] px-4 py-2">
@@ -259,14 +269,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             onClick={onPlayAgain}
             className="min-h-[48px] flex-1 cursor-pointer rounded-xl border-2 border-[#1E293B] bg-[#E63946] px-4 py-2.5 text-base font-black text-white shadow-[0_4px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
           >
-            YENİDEN OYNA
+            {primaryLabel}
           </button>
           <button
             type="button"
             onClick={onCharacterSelect}
             className="min-h-[48px] flex-1 cursor-pointer rounded-xl border-2 border-[#1E293B] bg-[#FDE68A] px-4 py-2.5 text-base font-black text-[#1E293B] shadow-[0_4px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
           >
-            KARAKTER SEÇİMİNE DÖN
+            {secondaryLabel}
           </button>
         </div>
       </div>

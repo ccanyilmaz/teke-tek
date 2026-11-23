@@ -91,24 +91,24 @@ export const VSScreen: React.FC<VSScreenProps> = ({
   const oppDef = getCharacterById(displayedOpponentId);
 
   return (
-    <div className="relative z-20 flex h-dvh w-full flex-col justify-between overflow-y-auto bg-[#FBF7EE] px-4 py-3 sm:px-6 sm:py-6">
+    <div className="relative z-20 flex h-dvh w-full flex-col justify-between overflow-y-auto bg-[#FBF7EE] px-4 py-2 sm:px-6 sm:py-5">
       {/* Top Bar */}
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBackToSelect}
           aria-label="Karakter seçimine dön"
-          className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border-2 border-[#1E293B] bg-[#FFFDF7] px-3.5 py-2 text-sm font-bold text-[#1E293B] shadow-[0_3px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
+          className="inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl border-2 border-[#1E293B] bg-[#FFFDF7] px-3 py-1.5 text-xs font-bold text-[#1E293B] shadow-[0_3px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none sm:min-h-[44px] sm:px-3.5 sm:py-2 sm:text-sm"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           <span>Geri</span>
         </button>
 
         <div className="text-center">
-          <span className="text-xs font-extrabold uppercase tracking-widest text-[#E63946]">
+          <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#E63946] sm:text-xs">
             İLK 3 RAUND KAZANIR
           </span>
-          <h1 className="text-xl font-black tracking-tight text-[#1E293B] sm:text-3xl">
+          <h1 className="text-lg font-black tracking-tight text-[#1E293B] sm:text-3xl">
             RAKİP BELİRLENİYOR
           </h1>
         </div>
@@ -117,7 +117,7 @@ export const VSScreen: React.FC<VSScreenProps> = ({
           type="button"
           onClick={onToggleMute}
           aria-label={muted ? 'Sesi aç' : 'Sesi kapat'}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border-2 border-[#1E293B] bg-[#FFFDF7] text-[#1E293B] shadow-[0_3px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
+          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border-2 border-[#1E293B] bg-[#FFFDF7] text-[#1E293B] shadow-[0_3px_0_#1E293B] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none sm:h-11 sm:w-11"
         >
           {muted ? (
             <VolumeX className="h-5 w-5" aria-hidden="true" />
@@ -127,30 +127,30 @@ export const VSScreen: React.FC<VSScreenProps> = ({
         </button>
       </div>
 
-      {/* Two-Sided VS Face-off */}
-      <div className="mx-auto my-auto flex w-full max-w-4xl flex-col items-center justify-center gap-4 py-4 sm:flex-row sm:gap-6">
+      {/* Two-Sided VS Face-off (always horizontal in landscape) */}
+      <div className="mx-auto my-auto flex w-full max-w-4xl flex-row items-center justify-center gap-3 py-2 sm:gap-6 sm:py-4">
         {/* Left: Player (Locked) */}
-        <div className="flex w-full max-w-[270px] flex-col items-center rounded-3xl border-[3px] border-[#1E293B] bg-[#FFFDF7] p-4 text-center shadow-[0_6px_0_#1E293B] sm:p-6">
-          <span className="mb-2 text-xs font-black uppercase tracking-wider text-[#E63946]">
+        <div className="flex w-full max-w-[230px] flex-col items-center rounded-3xl border-[3px] border-[#1E293B] bg-[#FFFDF7] p-3 text-center shadow-[0_5px_0_#1E293B] sm:max-w-[270px] sm:p-6">
+          <span className="mb-1 text-[10px] font-black uppercase tracking-wider text-[#E63946] sm:mb-2 sm:text-xs">
             SENİN DÖVÜŞÇÜN
           </span>
           <CharacterPortrait
             characterId={playerDef.id}
             size={108}
-            className="h-24 w-24 sm:h-28 sm:w-28"
+            className="h-16 w-16 sm:h-28 sm:w-28"
           />
-          <h2 className="mt-3 text-2xl font-black text-[#1E293B]">
+          <h2 className="mt-1.5 text-lg font-black text-[#1E293B] sm:mt-3 sm:text-2xl">
             {playerDef.upperName}
           </h2>
-          <p className="mt-1 text-xs font-medium text-[#64748B]">
+          <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-[#64748B] sm:text-xs">
             {playerDef.tagline}
           </p>
         </div>
 
         {/* Center VS Emblem */}
         <div className="flex shrink-0 flex-col items-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] border-[#1E293B] bg-[#FACC15] shadow-[0_4px_0_#1E293B] sm:h-20 sm:w-20">
-            <span className="text-2xl font-black tracking-tight text-[#1E293B] sm:text-3xl">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-[#1E293B] bg-[#FACC15] shadow-[0_4px_0_#1E293B] sm:h-20 sm:w-20">
+            <span className="text-lg font-black tracking-tight text-[#1E293B] sm:text-3xl">
               VS
             </span>
           </div>
@@ -158,34 +158,34 @@ export const VSScreen: React.FC<VSScreenProps> = ({
 
         {/* Right: Opponent Slot Roulette */}
         <div
-          className={`flex w-full max-w-[270px] flex-col items-center rounded-3xl border-[3px] p-4 text-center transition-all duration-150 sm:p-6 ${
+          className={`flex w-full max-w-[230px] flex-col items-center rounded-3xl border-[3px] p-3 text-center transition-all duration-150 sm:max-w-[270px] sm:p-6 ${
             locked
-              ? 'scale-[1.02] border-[#1E293B] bg-[#E0F2FE] shadow-[0_6px_0_#1E293B]'
-              : 'border-[#0284C7] bg-[#FFFDF7] shadow-[0_6px_0_#0284C7]'
+              ? 'scale-[1.02] border-[#1E293B] bg-[#E0F2FE] shadow-[0_5px_0_#1E293B]'
+              : 'border-[#0284C7] bg-[#FFFDF7] shadow-[0_5px_0_#0284C7]'
           }`}
         >
-          <span className="mb-2 text-xs font-black uppercase tracking-wider text-[#0284C7]">
+          <span className="mb-1 text-[10px] font-black uppercase tracking-wider text-[#0284C7] sm:mb-2 sm:text-xs">
             {locked ? 'RAKİP HAZIR!' : 'RULET DÖNÜYOR...'}
           </span>
           <div className={locked ? 'scale-105 transition-transform' : 'transition-transform'}>
             <CharacterPortrait
               characterId={oppDef.id}
               size={108}
-              className="h-24 w-24 sm:h-28 sm:w-28"
+              className="h-16 w-16 sm:h-28 sm:w-28"
             />
           </div>
-          <h2 className="mt-3 text-2xl font-black text-[#1E293B]">
+          <h2 className="mt-1.5 text-lg font-black text-[#1E293B] sm:mt-3 sm:text-2xl">
             {oppDef.upperName}
           </h2>
-          <p className="mt-1 text-xs font-medium text-[#64748B]">
+          <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-[#64748B] sm:text-xs">
             {oppDef.tagline}
           </p>
         </div>
       </div>
 
       {/* Bottom Auto-Transition Status */}
-      <div className="mx-auto flex min-h-[48px] w-full max-w-sm flex-col items-center justify-center pb-2">
-        <p className="text-sm font-bold text-[#64748B]">
+      <div className="mx-auto flex min-h-[32px] w-full max-w-sm flex-col items-center justify-center pb-1 sm:min-h-[44px]">
+        <p className="text-xs font-bold text-[#64748B] sm:text-sm">
           {locked ? 'Silah ruletine geçiliyor...' : 'Rastgele rakip seçiliyor...'}
         </p>
       </div>

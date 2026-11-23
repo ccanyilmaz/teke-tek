@@ -413,6 +413,9 @@ function applyDamageHit(
     match.events.push({
       type: defender.hp <= 0 ? 'ko' : 'blocked',
       attackerRole: attacker.role,
+      targetRole: defender.role,
+      targetRemainingHp: defender.hp,
+      damageAmount: blockedDamage,
       weaponId: weapon.id,
       x: hitX,
       y: hitY,
@@ -524,6 +527,9 @@ function applyDamageHit(
   match.events.push({
     type: defender.hp <= 0 ? 'ko' : 'hit',
     attackerRole: attacker.role,
+    targetRole: defender.role,
+    targetRemainingHp: defender.hp,
+    damageAmount: finalDamage,
     weaponId: weapon.id,
     x: hitX,
     y: hitY,
@@ -1249,11 +1255,13 @@ function resolveFighterSeparation(a: FighterState, b: FighterState): void {
 }
 
 /**
- * Advances the simulation by one clamped frame (`dt <= 0.05s`).
+ * Advances a 2-player authoritative match by one clamped frame (`dt <= 0.05s`).
+ * Shared identically by Single Player (AI-controlled opponent) and Server Multiplayer.
  */
-export function stepMatch(
+export function stepTwoPlayerMatch(
   match: MatchState,
   playerIntent: InputIntent,
+  opponentIntent: InputIntent,
   rawDt: number,
   rng: () => number = Math.random
 ): void {
@@ -1263,13 +1271,19 @@ export function stepMatch(
   // Decay camera trauma in real time
   match.cameraTrauma = Math.max(0, match.cameraTrauma - dt * 2.4);
 
-  // Brief hitstop freeze for crunchy impact while hit flash ticks & player inputs stay buffered
+  // Brief hitstop freeze for crunchy impact while hit flash ticks & inputs stay buffered
   if (match.hitstopTimer > 0) {
     if (playerIntent.punchPressed) {
       match.player.punchBufferTimer = 0.16;
     }
     if (playerIntent.specialPressed) {
       match.player.specialBufferTimer = 0.16;
+    }
+    if (opponentIntent.punchPressed) {
+      match.opponent.punchBufferTimer = 0.16;
+    }
+    if (opponentIntent.specialPressed) {
+      match.opponent.specialBufferTimer = 0.16;
     }
     match.hitstopTimer = Math.max(0, match.hitstopTimer - dt);
     match.player.hitFlashTimer = Math.max(0, match.player.hitFlashTimer - dt);
@@ -1299,19 +1313,9 @@ export function stepMatch(
 
   match.elapsedTime += dt;
 
-  const aiIntent = computeAIIntent(
-    match.ai,
-    match.opponent,
-    match.player,
-    match.bounds,
-    dt,
-    rng,
-    match.floorStones
-  );
-
   updateFighterAction(match.player, match.opponent, playerIntent, dt, match, rng);
   if (match.winnerRole === null) {
-    updateFighterAction(match.opponent, match.player, aiIntent, dt, match, rng);
+    updateFighterAction(match.opponent, match.player, opponentIntent, dt, match, rng);
   }
 
   updateProjectilesAndStones(match, dt, rng);
@@ -1319,4 +1323,30 @@ export function stepMatch(
   resolveFighterSeparation(match.player, match.opponent);
   clampFighterToArena(match.player, match.bounds);
   clampFighterToArena(match.opponent, match.bounds);
+}
+
+/**
+ * Advances the single-player simulation by one clamped frame (`dt <= 0.05s`).
+ */
+export function stepMatch(
+  match: MatchState,
+  playerIntent: InputIntent,
+  rawDt: number,
+  rng: () => number = Math.random
+): void {
+  const dt = Math.min(Math.max(rawDt, 0), 0.05);
+  const aiIntent =
+    match.hitstopTimer > 0 || match.winnerRole !== null
+      ? { moveX: 0, moveY: 0, punchPressed: false }
+      : computeAIIntent(
+          match.ai,
+          match.opponent,
+          match.player,
+          match.bounds,
+          dt,
+          rng,
+          match.floorStones
+        );
+
+  stepTwoPlayerMatch(match, playerIntent, aiIntent, dt, rng);
 }
